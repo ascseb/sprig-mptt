@@ -36,18 +36,6 @@ abstract class Sprig_MPTT extends Sprig
 	public $scope_column = NULL;
 	
 	/**
-	 * @access protected
-	 * @var string mptt view folder.
-	 */
-	protected $_directory = 'mptt';
-	
-	/**
-	 * @access protected
-	 * @var string default view folder.
-	 */
-	protected $_style = 'default';
-	
-	/**
 	 * Initialize the fields and add MPTT field defaults if not specified
 	 * @return void
 	 */
@@ -342,7 +330,8 @@ abstract class Sprig_MPTT extends Sprig
 		
 		if ($leaves_only)
 		{
-			$query->where($this->right_column, '=', new Database_Expression('`'.$this->left_column.'` + 1'));
+			$db = Database::instance($this->_db);
+			$query->where($this->right_column, '=', DB::expr($db->quote_identifier($this->left_column).' + 1'));
 		}
 		
 		return $limit ? $query->limit($limit) : $query;
@@ -780,14 +769,19 @@ abstract class Sprig_MPTT extends Sprig
 			
 			$offset = ($left_offset - $this->{$this->left_column});
 			
+			$db = Database::instance($this->_db);
+			
 			// Update the values.
-			Database::instance($this->_db)->query(NULL, 'UPDATE '.$this->_table.' 
-				SET `'.$this->left_column.'` = `'.$this->left_column.'` + '.$offset.', `'.$this->right_column.'` = `'.$this->right_column.'` + '.$offset.'
-				, `'.$this->level_column.'` = `'.$this->level_column.'` + '.$level_offset.'
-				, `'.$this->scope_column.'` = '.$target->{$this->scope_column}.' 
-				WHERE `'.$this->left_column.'` >= '.$this->{$this->left_column}.' 
-				AND `'.$this->right_column.'` <= '.$this->{$this->right_column}.' 
-				AND `'.$this->scope_column.'` = '.$this->{$this->scope_column}, TRUE);
+			DB::update($this->_table)
+				->set(array(
+					$this->left_column	=> $this->{$this->left_column}	+ $offset,
+					$this->right_column	=> $this->{$this->right_column}	+ $offset,
+					$this->level_column	=> $this->{$this->level_column}	+ $level_offset,
+					$this->scope_column	=> $target->{$this->scope_column}
+				))
+				->where($this->left_column, '>=', $this->{$this->left_column})
+				->where($this->right_column, '<=',$this->{$this->right_column})
+				->where($this->scope_column, '=', $this->{$this->scope_column});
 			
 			$this->delete_space($this->{$this->left_column}, $size);
 		}
@@ -834,79 +828,6 @@ abstract class Sprig_MPTT extends Sprig
 			default:
 				return parent::__get($column);
 		}
-	}
-	
-	/**
-	 * Verify the tree is in good order 
-	 * 
-	 * This functions speed is irrelevant - its really only for debugging and unit tests
-	 * 
-	 * @todo Look for any nodes no longer contained by the root node.
-	 * @todo Ensure every node has a path to the root via ->parents(); 
-	 * @access public
-	 * @return boolean
-	 */
-	public function verify_tree()
-	{
-		foreach ($this->get_scopes() as $scope)
-		{
-			if ( ! $this->verify_scope($scope->scope))
-				return FALSE;
-		}
-		return TRUE;
-	}
-	
-	private function get_scopes()
-	{
-		// TODO... redo this so its proper :P and open it public
-		// used by verify_tree()
-		return DB::select()->as_object()->distinct($this->scope_column)->from($this->_table)->execute($this->_db);
-	}
-	
-	public function verify_scope($scope)
-	{
-		$root = $this->root($scope);
-		
-		$end = $root->{$this->right_column};
-		
-		// Find nodes that have slipped out of bounds.
-		$result = Database::instance($this->_db)->query(Database::SELECT, 'SELECT count(*) as count FROM `'.$this->_table.'` 
-			WHERE `'.$this->scope_column.'` = '.$root->scope.' AND (`'.$this->left_column.'` > '.$end.' 
-			OR `'.$this->right_column.'` > '.$end.')', TRUE);
-		if ($result[0]->count > 0)
-			return FALSE;
-		
-		// Find nodes that have the same left and right value
-		$result = Database::instance($this->_db)->query(Database::SELECT, 'SELECT count(*) as count FROM `'.$this->_table.'` 
-			WHERE `'.$this->scope_column.'` = '.$root->scope.' 
-			AND `'.$this->left_column.'` = `'.$this->right_column.'`', TRUE);
-		if ($result[0]->count > 0)
-			return FALSE;
-		
-		// Find nodes that right value is less than the left value
-		$result = Database::instance($this->_db)->query(Database::SELECT, 'SELECT count(*) as count FROM `'.$this->_table.'` 
-			WHERE `'.$this->scope_column.'` = '.$root->scope.' 
-			AND `'.$this->left_column.'` > `'.$this->right_column.'`', TRUE);
-		if ($result[0]->count > 0)
-			return FALSE;
-		
-		// Make sure no 2 nodes share a left/right value
-		$i = 1;
-		while ($i <= $end)
-		{
-			$result = Database::instance($this->_db)->query(Database::SELECT, 'SELECT count(*) as count FROM `'.$this->_table.'` 
-				WHERE `'.$this->scope_column.'` = '.$root->scope.' 
-				AND (`'.$this->left_column.'` = '.$i.' OR `'.$this->right_column.'` = '.$i.')', TRUE);
-			
-			if ($result[0]->count > 1)
-				return FALSE;
-				
-			$i++;
-		}
-		
-		// Check to ensure that all nodes have a "correct" level
-		
-		return TRUE;
 	}
 	
 	/**
