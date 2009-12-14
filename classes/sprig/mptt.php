@@ -934,44 +934,5 @@ abstract class Sprig_MPTT extends Sprig
 		
 		return $this->values($mptt_vals);
 	}
-		
-	/**
-	 * Generates the HTML for this node's descendants
-	 *
-	 * @param string $style pagination style.
-	 * @param boolean $self include this node or not.
-	 * @param string $direction direction to order the left column by.
-	 * @return View
-	 */
-	public function render_descendants($style = NULL, $self = FALSE, $direction = 'ASC')
-	{
-		$nodes = $this->descendants($self, $direction);
-		
-		if ($style === NULL)
-		{
-			$style = $this->_style;
-		}
 
-		return View::factory($this->_directory.DIRECTORY_SEPARATOR.$style, array('nodes' => $nodes,'level_column' => $this->level_column));
-	}
-	
-	/**
-	 * Generates the HTML for this node's children
-	 *
-	 * @param string $style pagination style.
-	 * @param boolean $self include this node or not.
-	 * @param string $direction direction to order the left column by.
-	 * @return View
-	 */
-	public function render_children($style = NULL, $self = FALSE, $direction = 'ASC')
-	{
-		$nodes = $this->children($self, $direction);
-		
-		if ($style === NULL)
-		{
-			$style = $this->_style;
-		}
-
-		return View::factory($this->_directory.DIRECTORY_SEPARATOR.$style, array('nodes' => $nodes,'level_column' => $this->level_column));
-	}
 }
