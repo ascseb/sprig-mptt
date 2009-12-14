@@ -808,23 +808,23 @@ abstract class Sprig_MPTT extends Sprig
 		switch ($column)
 		{
 			case 'parent':
-				return $this->parent();
+				return Sprig::factory($this->_model)->load($this->parent());
 			case 'parents':
-				return $this->parents();
+				return Sprig::factory($this->_model)->load($this->parents());
 			case 'children':
-				return $this->children();
+				return Sprig::factory($this->_model)->load($this->children());
 			case 'first_child':
-				return $this->children(FALSE, 'ASC', 1);
+				return Sprig::factory($this->_model)->load($this->children(FALSE, 'ASC', 1));
 			case 'last_child':
-				return $this->children(FALSE, 'DESC', 1);
+				return Sprig::factory($this->_model)->load($this->children(FALSE, 'DESC', 1));
 			case 'siblings':
-				return $this->siblings();
+				return Sprig::factory($this->_model)->load($this->siblings());
 			case 'root':
-				return $this->root();
+				return Sprig::factory($this->_model)->load($this->root());
 			case 'leaves':
-				return $this->leaves();
+				return Sprig::factory($this->_model)->load($this->leaves());
 			case 'descendants':
-				return $this->descendants();
+				return Sprig::factory($this->_model)->load($this->descendants());
 			default:
 				return parent::__get($column);
 		}
