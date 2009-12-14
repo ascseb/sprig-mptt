@@ -53,7 +53,10 @@ To create a new MPTT record, you need to use one of the insert_* methods.
 Before you create any other records in a tree, you need to create the root record for the tree. This can be done like:
 
 	// Get the root node for the scope 1
-	$root = Sprig::factory('test')->root(1);
+	$root = Sprig::factory('test')->load(
+			Sprig_MPTT::factory('test')
+				->root(1)
+		);
 	
 	// If the root node isn't loaded, we must create it before we can do anything else with the tree in scope 1
 	if ( ! $root->loaded())
@@ -112,13 +115,23 @@ A model's related nodes can be accessed using:
 	$model->leaves;		// returns DB result containing all children who have no further children
 	$model->root;		// retruns root node of current scope tree
 
-To specify ordering or whether or not to include the current object in the result, use the correspondingly named methods `parents()`, `children()` etc.
+To specify ordering, constraining query results, or whether to include the current object in the result, use the correspondingly named methods `parents()`, `children()` etc.
 
-### Printing the Tree
+NOTE: Using the methods returns the SQL query rather then the sprig object, so you'll have to load the query back into a new Sprig object in order to obtain the results.
 
-`select_list()` has been extended to support indenting as in ORM_MPTT
+### Adding query constraints.
 
-You may aslo use the render_descendants() or render_children() methods along to render HTML tree representations. Four example views copied from ORM_MPTT are included and demonstrate simple `<ul>` and `<table>` based lists as well as simple jQuery and YUI tree views.
+Using the selectors described in the previous section will return the sprig objects which unlike ORM, contain no methods for constraining SQL results. That is why the selector methods return the raw queries, whilst the selector properties return the Sprig objects.
+
+For example, to select all children of the current 'foo' model with the field 'bar' being equal to 'baz', you would type:
+
+	$result = Sprig::factory('foo')->load(
+		Sprig_MPTT::factory('foo')
+			->children()
+			->where('bar', '=', 'baz');
+		);
+
+The use of Sprig_MPTT over Sprig is irrelevent, i've only done that for the code's readability.
 
 ## TODO
 
