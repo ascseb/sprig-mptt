@@ -245,7 +245,9 @@ abstract class Sprig_MPTT extends Sprig
 			return FALSE;
 		}
 		
-		return Sprig_MPTT::factory($this->_model, array($this->left_column => 1, $this->scope_column => $scope))->load();
+		return DB::select()
+			->where($this->left_column, '=', 1)
+			->where($this->scope_column, '=', $scope);
 	}
 	
 	/**
@@ -281,17 +283,13 @@ abstract class Sprig_MPTT extends Sprig
 			$query->where($this->left_column, '!=', 1);
 		}	
 		
-		$limit = FALSE;
-		
 		if ($direct_parent_only)
 		{
 			$query->where($this->level_column, '=', $this->{$this->level_column} - 1);
-			$limit = 1;
+			$query->limit(1);
 		}
 		
-		$parents =  Sprig_MPTT::factory($this->_model)->load($query, $limit);
-		
-		return $parents;
+		return $query;
 	}
 	
 	/**
@@ -347,7 +345,7 @@ abstract class Sprig_MPTT extends Sprig
 			$query->where($this->right_column, '=', new Database_Expression('`'.$this->left_column.'` + 1'));
 		}
 		
-		return Sprig_MPTT::factory($this->_model)->load($query, $limit);
+		return $limit ? $query->limit($limit) : $query;
 	}
 	
 	/**
@@ -372,7 +370,7 @@ abstract class Sprig_MPTT extends Sprig
 			$query->where($this->pk(), '<>', $this->{$this->pk()});
 		}
 		
-		return Sprig_MPTT::factory($this->_model)->load($query, FALSE);
+		return $query;
 	}
 	
 	/**
