@@ -290,9 +290,8 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 		$query = $query instanceof Database_Query_Builder_Select ? $query : DB::select();
 
 		$query
-			->where("{$table}.{$this->left_column}", '<=', $this->{$this->left_column})
-			->where("{$table}.{$this->right_column}", '>=', $this->{$this->right_column})
-			->where($this->pk($table), '<>', $this->{$this->pk()})
+			->where("{$table}.{$this->left_column}", '<', $this->{$this->left_column})
+			->where("{$table}.{$this->right_column}", '>', $this->{$this->right_column})
 			->where("{$table}.{$this->scope_column}", '=', $this->{$this->scope_column})
 			->order_by("{$table}.{$this->left_column}", $direction);
 			

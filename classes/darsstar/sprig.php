@@ -117,7 +117,7 @@ abstract class Darsstar_Sprig extends Shadowhand_Sprig {
 						if ($field instanceof Sprig_Field_MPTT_Parent)
 						{
 							$query
-								->on("{$table}.{$this->level_column}", '=', DB::expr(Database::instance($this->_db)->quote_identifier("{$parent_path}.{$this->level_column}").' - 1'));
+								->on("{$target_path}.{$this->level_column}", '=', DB::expr(Database::instance($this->_db)->quote_identifier("{$parent_path}.{$this->level_column}").' - 1'));
 						}
 						else
 						{
