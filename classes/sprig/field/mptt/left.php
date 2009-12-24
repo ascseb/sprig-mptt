@@ -1,7 +1,3 @@
-<?php defined('SYSPATH') or die('No direct script access.');
+<?php defined('SYSPATH') OR die('No direct access allowed.');
 
-class Sprig_Field_MPTT_Left extends Sprig_Field_MPTT {
-	
-	public $column = 'lft';
-	
-} // End Sprig_Field_MPTT_Left
+class Sprig_Field_MPTT_Left extends Darsstar_Sprig_Field_MPTT_Left {}

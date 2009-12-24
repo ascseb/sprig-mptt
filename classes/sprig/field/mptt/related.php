@@ -1,7 +1,3 @@
-<?php defined('SYSPATH') or die('No direct script access.');
+<?php defined('SYSPATH') OR die('No direct access allowed.');
 
-class Sprig_Field_MPTT_Related extends Sprig_Field_MPTT {
-	
-	public $in_db = FALSE;
-	
-} // End Sprig_Field_MPTT_Left
+class Sprig_Field_MPTT_Related extends Darsstar_Sprig_Field_MPTT_Related {}

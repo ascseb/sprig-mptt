@@ -1,7 +1,3 @@
-<?php defined('SYSPATH') or die('No direct script access.');
+<?php defined('SYSPATH') OR die('No direct access allowed.');
 
-abstract class Sprig_Field_MPTT extends Sprig_Field_Integer {
-	
-	public $editable = FALSE;
-	
-} // End Sprig_Field_MPTT
+abstract class Sprig_Field_MPTT extends Darsstar_Sprig_Field_MPTT {}
