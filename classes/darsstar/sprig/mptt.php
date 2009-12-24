@@ -112,7 +112,10 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 
 		foreach ($related as $field)
 		{
-			$this->_fields[$field] = new Sprig_Field_MPTT_Related;
+			$sprig_field = 'Sprig_Field_MPTT_'.ucwords($field);
+			$this->_fields[$field] = new $sprig_field(array(
+				'model' => $this->_model,
+			));
 		}
 
 		// Check we have default values for all (MPTT) fields (otherwise we cause errors)

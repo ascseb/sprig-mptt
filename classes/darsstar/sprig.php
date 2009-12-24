@@ -67,9 +67,8 @@ abstract class Darsstar_Sprig extends Shadowhand_Sprig {
 
 					$field = $parent->_fields[$alias];
 
-					if (! ($field instanceof Sprig_Field_MPTT_Related) OR
-					    ! ($field instanceof Sprig_Field_ForeignKey) OR
-					      ($field instanceof Sprig_Field_HasMany))
+					if ( ! ($field instanceof Sprig_Field_ForeignKey) OR
+					       ($field instanceof Sprig_Field_HasMany))
 						throw new Sprig_Exception(':name model cannot load with :field, it is not the correct relation type',
 							array(':name' => get_class($parent), ':field' => $alias));
 
@@ -102,12 +101,29 @@ abstract class Darsstar_Sprig extends Shadowhand_Sprig {
 				
 				if ($field instanceof Sprig_Field_MPTT_Related)
 				{
-					$target->table($target_path);
-
-					if (in_array($alias, array('first_child', 'last_child')))
+					if ($field instanceof Sprig_Field_MPTT_Root)
 					{
-						$order = $alias === 'first_child' ? 'ASC' : 'DESC';
-						$target->children($query, FALSE, $order);
+						$query
+							->on("{$target_path}.{$target->_left_column}", '=', DB::expr('1'))
+							->on("{$target_path}.{$target->_scope_column}", '=', "{$parent_path}.{$parent->_scope_column}");
+					}
+					elseif ($field instanceof Sprig_Field_MPTT_Parents)
+					{
+						$query
+							->on("{$target_path}.{$this->left_column}", '<', "{$parent_path}.{$this->left_column}")
+							->on("{$target_path}.{$this->right_column}", '>', "{$parent_path}.{$this->right_column}")
+							->on("{$target_path}.{$this->scope_column}", '=', "{$parent_path}.{$this->scope_column}");
+
+						if ($field instanceof Sprig_Field_MPTT_Parent)
+						{
+							$query
+								->on("{$table}.{$this->level_column}", '=', DB::expr(Database::instance($this->_db)->quote_identifier("{$parent_path}.{$this->level_column}").' - 1'));
+						}
+						else
+						{
+							$query
+								->order_by("{$target_path}.{$this->left_column}", $direction);
+						}
 					}
 					else
 					{
