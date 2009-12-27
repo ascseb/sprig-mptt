@@ -12,6 +12,22 @@
 abstract class Darsstar_Sprig_MPTT extends Sprig
 {
 	/**
+	 * @access static
+	 * @var array MPTT fields
+	 */
+	protected static $_mptt_related = array(
+			'root' => 'root',
+			'parent' => 'parent',
+			'ancestor' => 'ancestors',
+			'child' => 'children',
+			'first_child' => 'first_child',
+			'last_child' => 'last_child',
+			'descendant' => 'descendants',
+			'sibling' => 'siblings',
+			'leaf' => 'leaves'
+		);
+
+	/**
 	 * @access public
 	 * @var string left column name.
 	 */
@@ -73,6 +89,12 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 					$this->scope_column = $name;
 				}
 			}
+			elseif (($field instanceof Sprig_Field_MPTT_Related  AND ! array_key_exists($name, self::$_mptt_related))
+			        OR ( ! $field instanceof Sprig_Field_MPTT_Related AND array_key_exists($name, self::$_mptt_related))
+				   )
+			{
+				unset($this->_fields[$name]);
+			}
 		}
 
 		// If any of the MPTT fields havn't been defined, create defaults
@@ -97,25 +119,15 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 			$this->_fields['scope'] = new Sprig_Field_MPTT_Scope(array('column' => 'scope'));;
 		}
 
-		// Set all related fields so we can 'with' them
-		$related = array(
-			'root',
-			'parent',
-			'parents',
-			'children',
-			'first_child',
-			'last_child',
-			'descendants',
-			'siblings',
-			'leaves'
-		);
-
-		foreach ($related as $field)
+		foreach (self::$_mptt_related as $field => $suffix)
 		{
-			$sprig_field = 'Sprig_Field_MPTT_'.ucwords($field);
-			$this->_fields[$field] = new $sprig_field(array(
-				'model' => $this->_model,
-			));
+			if ( ! array_key_exists($field, $this->_fields))
+			{
+				$sprig_field = 'Sprig_Field_MPTT_'.ucwords($suffix);
+				$this->_fields[$field] = new $sprig_field(array(
+					'model' => $this->_model,
+				));
+			}
 		}
 
 		// Check we have default values for all (MPTT) fields (otherwise we cause errors)
@@ -169,7 +181,23 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	{
 		return ! $this->has_children();
 	}
-	
+
+	/**
+	 * Is the current node a descendant of the supplied node.
+	 *
+	 * @access public
+	 * @param Sprig_MPTT $target Target
+	 * @return bool
+	 */
+	public function is_ancestor($target)
+	{
+		return (
+					$this->{$this->left_column} < $target->{$this->left_column} 
+					AND $this->{$this->right_column} > $target->{$this->right_column} 
+					AND $this->{$this->scope_column} = $target->{$this->scope_column}
+				);
+	}
+
 	/**
 	 * Is the current node a descendant of the supplied node.
 	 *
@@ -185,7 +213,7 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 					AND $this->{$this->scope_column} = $target->{$this->scope_column}
 				);
 	}
-	
+
 	/**
 	 * Is the current node a direct child of the supplied node?
 	 *
@@ -242,24 +270,29 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @access protected
 	 * @return Sprig_MPTT/FALSE on invalid scope
 	 */
-	public function root( & $query, $scope = NULL)
+	public function root( & $query = NULL, $scope = NULL)
 	{
+		if ($scope === NULL AND $this->loaded())
+		{
+			$scope = $this->{$this->scope_column};
+		}
+		elseif ($scope === NULL AND ! $this->loaded())
+		{
+			return FALSE;
+		}
+
 		$table = is_array($this->_table) ? $this->_table[1] : $this->_table;
 
 		$query = $query instanceof Database_Query_Builder_Select ? $query : DB::select();
 
-		if ($scope === NULL AND $this->_loaded)
-		{
-			$scope = $this->{$this->scope_column};
-		}
-		elseif ($scope === NULL AND ! $this->_loaded)
-		{
-			return FALSE;
-		}
-		
 		$query
 			->where("{$table}.{$this->left_column}", '=', 1)
 			->where("{$table}.{$this->scope_column}", '=', $scope);
+
+		if ( ! func_num_args())
+		{
+			return Sprig::factory($this->_model)->load($query);
+		}
 
 		return $this;
 	}
@@ -270,20 +303,27 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @access public
 	 * @return Sprig_MPTT
 	 */
-	public function parent( & $query)
+	public function parent( & $query = NULL)
 	{
-		return $this->parents($query, TRUE, 'ASC', TRUE);
+		$this->ancestors($query, TRUE, 'ASC', TRUE);
+
+		if ( ! func_num_args())
+		{
+			return Sprig::factory($this->_model)->load($query);
+		}
+
+		return $this;
 	}
 	
 	/**
-	 * Returns the parents of the current node.
+	 * Returns the ancestors of the current node.
 	 *
 	 * @access public
 	 * @param bool $root include the root node?
 	 * @param string $direction direction to order the left column by.
 	 * @return Sprig_MPTT
 	 */
-	public function parents( & $query, $root = TRUE, $direction = 'ASC', $direct_parent_only = FALSE)
+	public function ancestors( & $query = NULL, $root = TRUE, $direction = 'ASC', $direct_parent_only = FALSE)
 	{
 		$table = is_array($this->_table) ? $this->_table[1] : $this->_table;
 
@@ -299,13 +339,18 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 		{
 			$query->where("{$table}.{$this->left_column}", '!=', 1);
 		}	
-		
+
 		if ($direct_parent_only)
 		{
 			$query->where("{$table}.{$this->level_column}", '=', $this->{$this->level_column} - 1);
 			$query->limit(1);
 		}
-		
+
+		if ( ! func_num_args())
+		{
+			return Sprig::factory($this->_model)->load($query, FALSE);
+		}
+
 		return $this;
 	}
 
@@ -317,9 +362,16 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param string $direction direction to order the left column by.
 	 * @return Sprig_MPTT
 	 */
-	public function children( & $query, $self = FALSE, $direction = 'ASC', $limit = FALSE)
+	public function children( & $query = NULL, $self = FALSE, $direction = 'ASC', $limit = FALSE)
 	{
-		return $this->descendants($query, $self, $direction, TRUE, FALSE, $limit);
+		$this->descendants($query, $self, $direction, TRUE, FALSE, $limit);
+
+		if ( ! func_num_args())
+		{
+			return Sprig::factory($this->_model)->load($query, FALSE);
+		}
+
+		return $this;
 	}
 
 	/**
@@ -330,7 +382,7 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param string $direction direction to order the left column by.
 	 * @return Sprig_MPTT
 	 */
-	public function descendants( & $query, $self = FALSE, $direction = 'ASC', $direct_children_only = FALSE, $leaves_only = FALSE, $limit = FALSE)
+	public function descendants( & $query = NULL, $self = FALSE, $direction = 'ASC', $direct_children_only = FALSE, $leaves_only = FALSE, $limit = FALSE)
 	{
 		$table = is_array($this->_table) ? $this->_table[1] : $this->_table;
 
@@ -351,8 +403,8 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 			{
 				$query
 					->and_where_open()
-					->where("{$table}.{$this->level_column}", '=', $this->{$this->level_column})
-					->or_where("{$table}.{$this->level_column}", '=', $this->{$this->level_column} + 1)
+						->where("{$table}.{$this->level_column}", '=', $this->{$this->level_column})
+						->or_where("{$table}.{$this->level_column}", '=', $this->{$this->level_column} + 1)
 					->and_where_close();
 			}
 			else
@@ -363,13 +415,20 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 
 		if ($leaves_only)
 		{
-			$db = Database::instance($this->_db);
+			// Get the database instance
+			$db = $this->_db instanceof Database ? $this->_db : Database::instance($this->_db);
+
 			$query->where("{$table}.{$this->right_column}", '=', DB::expr($db->quote_identifier("{$table}.{$this->left_column}").' + 1'));
 		}
 
 		if ($limit)
 		{
 			$query->limit($limit);
+		}
+
+		if ( ! func_num_args())
+		{
+			return Sprig::factory($this->_model)->load($query, FALSE);
 		}
 
 		return $this;
@@ -383,7 +442,7 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param string $direction direction to order the left column by.
 	 * @return Sprig_MPTT
 	 */
-	public function siblings( & $query, $self = FALSE, $direction = 'ASC')
+	public function siblings( & $query = NULL, $self = FALSE, $direction = 'ASC')
 	{
 		$table = is_array($this->_table) ? $this->_table[1] : $this->_table;
 
@@ -395,12 +454,17 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 			->where("{$table}.{$this->scope_column}", '=', $this->{$this->scope_column})
 			->where("{$table}.{$this->level_column}", '=', $this->{$this->level_column})
 			->order_by("{$table}.{$this->left_column}", $direction);
-		
+
 		if ( ! $self)
 		{
 			$query->where($this->pk($table), '<>', $this->{$this->pk()});
 		}
-		
+
+		if ( ! func_num_args())
+		{
+			return Sprig::factory($this->_model)->load($query, FALSE);
+		}
+
 		return $this;
 	}
 	
@@ -410,9 +474,16 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @access public
 	 * @return Sprig_MPTT
 	 */
-	public function leaves( & $query, $self = FALSE, $direction = 'ASC')
+	public function leaves( & $query = NULL, $self = FALSE, $direction = 'ASC')
 	{
-		return $this->descendants($query, $self, $direction, TRUE, TRUE);
+		$this->descendants($query, $self, $direction, TRUE, TRUE);
+
+		if ( ! func_num_args())
+		{
+			return Sprig::factory($this->_model)->load($query, FALSE);
+		}
+
+		return $this;
 	}
 	
 	/**
@@ -435,15 +506,18 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 */
 	private function create_space($start, $size = 2)
 	{
+		// Get the database instance
+		$db = $this->_db instanceof Database ? $this->_db : Database::instance($this->_db);
+
 		// Update the left values, then the right.
 		DB::update($this->_table)
-			->set(array($this->left_column => new Database_Expression('`'.$this->left_column.'` + '.$size)))
+			->set(array($this->left_column => DB::expr($db->quote_identifier($this->left_column).' + '.$size)))
 			->where($this->left_column, '>=', $start)
 			->where($this->scope_column, '=', $this->{$this->scope_column})
 			->execute($this->_db);
 			
 		DB::update($this->_table)
-			->set(array($this->right_column => new Database_Expression('`'.$this->right_column.'` + '.$size)))
+			->set(array($this->right_column => DB::expr($db->quote_identifier($this->right_column).' + '.$size)))
 			->where($this->right_column, '>=', $start)
 			->where($this->scope_column, '=', $this->{$this->scope_column})
 			->execute($this->_db);
@@ -459,15 +533,18 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 */
 	private function delete_space($start, $size = 2)
 	{
+		// Get the database instance
+		$db = $this->_db instanceof Database ? $this->_db : Database::instance($this->_db);
+
 		// Update the left values, then the right.
 		DB::update($this->_table)
-			->set(array($this->left_column => new Database_Expression('`'.$this->left_column.'` - '.$size)))
+			->set(array($this->left_column => DB::expr($db->quote_identifier($this->left_column).' - '.$size)))
 			->where($this->left_column, '>=', $start)
 			->where($this->scope_column, '=', $this->{$this->scope_column})
 			->execute($this->_db);
 			
 		DB::update($this->_table)
-			->set(array($this->right_column => new Database_Expression('`'.$this->right_column.'` - '.$size)))
+			->set(array($this->right_column => DB::expr($db->quote_identifier($this->right_column).' - '.$size)))
 			->where($this->right_column, '>=', $start)
 			->where($this->scope_column, '=', $this->{$this->scope_column})
 			->execute($this->_db);
@@ -486,7 +563,7 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	public function insert_as_new_root($scope = 1)
 	{	
 		// Make sure the specified scope doesn't already exist.
-		$root = $this->root($scope);
+		$root = self::factory($this->_model)->root($query, $scope)->load($query);
 
 		if ($root->loaded())
 			return FALSE;
@@ -525,14 +602,12 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	protected function insert($target, $copy_left_from, $left_offset, $level_offset)
 	{
 		// Insert should only work on new nodes.. if its already it the tree it needs to be moved!
-		if ($this->_loaded)
+		if ($this->loaded())
 			return FALSE;
-		
-		
 		
 		if ( ! $target instanceof $this)
 		{
-			$target = Sprig_MPTT::factory($this->_model, array($this->pk() => $target))->load();
+			$target = Sprig::factory($this->_model, array($this->pk() => $target))->load();
 			
 			if ( ! $target->loaded())
 			{
@@ -811,19 +886,21 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 
 			$offset = ($left_offset - $this->{$this->left_column});
 
-			$db = Database::instance($this->_db);
+			// Get the database instance
+			$db = $this->_db instanceof Database ? $this->_db : Database::instance($this->_db);
 
 			// Update the values.
 			DB::update($this->_table)
 				->set(array(
-					$this->left_column	=> $this->{$this->left_column}	+ $offset,
-					$this->right_column	=> $this->{$this->right_column}	+ $offset,
-					$this->level_column	=> $this->{$this->level_column}	+ $level_offset,
+					$this->left_column	=> DB::expr($db->quote_identifier($this->left_column).' + '.$offset),
+					$this->right_column	=> DB::expr($db->quote_identifier($this->right_column).' + '.$offset),
+					$this->level_column	=> DB::expr($db->quote_identifier($this->level_column).' + '.$level_offset),
 					$this->scope_column	=> $target->{$this->scope_column}
 				))
 				->where($this->left_column, '>=', $this->{$this->left_column})
 				->where($this->right_column, '<=',$this->{$this->right_column})
-				->where($this->scope_column, '=', $this->{$this->scope_column});
+				->where($this->scope_column, '=', $this->{$this->scope_column})
+				->execute($db);
 
 			$this->delete_space($this->{$this->left_column}, $size);
 		}
@@ -865,26 +942,46 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 		switch ($name)
 		{
 			case 'parent':
-				return Sprig::factory($this->_model)->parent($query)->load($query);
-			case 'parents':
-				return Sprig::factory($this->_model)->parents($query)->load($query, FALSE);
+				$this->parent($query);
+				$limit = 1;
+			break;
+			case 'ancestors':
+				$this->ancestors($query);
+				$limit = FALSE;
+			break;
 			case 'children':
-				return Sprig::factory($this->_model)->children($children)->load($query, FALSE);
+				$this->children($query);
+				$limit = FALSE;
+			break;
 			case 'first_child':
-				return Sprig::factory($this->_model)->children($query, FALSE, 'ASC')->load($query);
+				$this->children($query, FALSE, 'ASC');
+				$limit = 1;
+			break;
 			case 'last_child':
-				return Sprig::factory($this->_model)->children($query, FALSE, 'DESC')->load($query);
+				$this->children($query, FALSE, 'DESC');
+				$limit = 1;
+			break;
 			case 'siblings':
-				return Sprig::factory($this->_model)->siblings($query)->load($query, FALSE);
+				$this->siblings($query);
+				$limit = FALSE;
+			break;
 			case 'root':
-				return Sprig::factory($this->_model)->root($query)->load($query);
+				$this->root($query);
+				$limit = 1;
+			break;
 			case 'leaves':
-				return Sprig::factory($this->_model)->leaves($query)->load($query, FALSE);
+				$this->leaves($query);
+				$limit = FALSE;
+			break;
 			case 'descendants':
-				return Sprig::factory($this->_model)->descendants($query)->load($query, FALSE);
+				$this->descendants($query);
+				$limit = FALSE;
+			break;
 			default:
 				return parent::__get($name);
 		}
+
+		return $this->_related[$name] = Sprig::factory($this->_model)->load($query, $limit);
 	}
 	
 	/**
@@ -894,7 +991,7 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 */
 	public function reload()
 	{
-		if ( ! $this->_loaded) 
+		if ( ! $this->loaded()) 
 		{
 			return FALSE;
 		}
