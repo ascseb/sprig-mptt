@@ -35,10 +35,12 @@ abstract class Darsstar_Sprig extends Shadowhand_Sprig {
 					$this->_related[$name]->state('loaded');
 					return;
 				}
+
+				$name .= ':'.$f_field;
 			}
 		}
 
-		return parent::__set($name, $value);
+		parent::__set($name, $value);
 	}
 
 	protected function _with($query, $target_path)
