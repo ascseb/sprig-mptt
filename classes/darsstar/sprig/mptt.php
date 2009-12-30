@@ -15,7 +15,7 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @access static
 	 * @var array MPTT fields
 	 */
-	protected static $_mptt_related = array(
+	public $related = array(
 			'root' => 'root',
 			'parent' => 'parent',
 			'ancestor' => 'ancestors',
@@ -89,8 +89,8 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 					$this->scope_column = $name;
 				}
 			}
-			elseif (($field instanceof Sprig_Field_MPTT_Related  AND ! array_key_exists($name, self::$_mptt_related))
-			        OR ( ! $field instanceof Sprig_Field_MPTT_Related AND array_key_exists($name, self::$_mptt_related))
+			elseif (($field instanceof Sprig_Field_MPTT_Related  AND ! array_key_exists($name, $this->related))
+			        OR ( ! $field instanceof Sprig_Field_MPTT_Related AND array_key_exists($name, $this->related))
 				   )
 			{
 				unset($this->_fields[$name]);
@@ -119,7 +119,19 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 			$this->_fields['scope'] = new Sprig_Field_MPTT_Scope(array('column' => 'scope'));;
 		}
 
-		foreach (self::$_mptt_related as $field => $suffix)
+		$suffixes = array(
+			'root',
+			'parent',
+			'ancestors',
+			'children',
+			'first_child',
+			'last_child',
+			'descendants',
+			'siblings',
+			'leaves'
+		);
+		
+		while (list($field) = each($this->related) AND list(, $suffix) = each($suffixes))
 		{
 			if ( ! array_key_exists($field, $this->_fields))
 			{
@@ -189,13 +201,12 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param Sprig_MPTT $target Target
 	 * @return bool
 	 */
-	public function is_ancestor($target)
+	public function is_ancestor(Sprig_MPTT $target)
 	{
-		return (
-					$this->{$this->left_column} < $target->{$this->left_column} 
-					AND $this->{$this->right_column} > $target->{$this->right_column} 
-					AND $this->{$this->scope_column} = $target->{$this->scope_column}
-				);
+		return ($this->{$this->left_column} < $target->{$this->left_column} 
+			AND $this->{$this->right_column} > $target->{$this->right_column} 
+			AND $this->{$this->scope_column} == $target->{$this->scope_column}
+		);
 	}
 
 	/**
@@ -205,13 +216,12 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param Sprig_MPTT $target Target
 	 * @return bool
 	 */
-	public function is_descendant($target)
+	public function is_descendant(Sprig_MPTT $target)
 	{
-		return (
-					$this->{$this->left_column} > $target->{$this->left_column} 
-					AND $this->{$this->right_column} < $target->{$this->right_column} 
-					AND $this->{$this->scope_column} = $target->{$this->scope_column}
-				);
+		return ($this->{$this->left_column} > $target->{$this->left_column}
+			AND $this->{$this->right_column} < $target->{$this->right_column}
+			AND $this->{$this->scope_column} == $target->{$this->scope_column}
+		);
 	}
 
 	/**
@@ -221,9 +231,11 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param Sprig_MPTT $target Target
 	 * @return bool
 	 */
-	public function is_child($target)
+	public function is_child(Sprig_MPTT $target)
 	{
-		return ($this->parent->{$this->pk()} === $target->{$this->pk()});
+		return ($this->is_descendant($target)
+			AND $this->{$this->level_column} + 1 == $target->{$this->level_column}
+		);
 	}
 	
 	/**
@@ -233,9 +245,9 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param Sprig_MPTT $target Target
 	 * @return bool
 	 */
-	public function is_parent($target)
+	public function is_parent(Sprig_MPTT $target)
 	{
-		return ($this->{$this->pk()} === $target->parent->{$this->pk()});
+		return $target->is_child($this);
 	}
 	
 	/**
@@ -245,7 +257,7 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param Sprig_MPTT $target Target
 	 * @return bool
 	 */
-	public function is_sibling($target)
+	public function is_sibling(Sprig_MPTT $target)
 	{
 		if ($this->{$this->pk()} === $target->{$this->pk()})
 			return FALSE;
@@ -753,8 +765,19 @@ abstract class Darsstar_Sprig_MPTT extends Sprig
 	 * @param string $indent character used for indenting.
 	 * @return array 
 	 */
-	public function select_list($key = 'id', $value = 'name', $indent = NULL)
+	public function select_list($key = NULL, $value = NULL, $indent = NULL)
 	{
+
+		if ($key === NULL)
+		{
+			$key = $this->pk();
+		}
+
+		if ($value === NULL)
+		{
+			$value = $this->tk();
+		}
+
 		$result = DB::select($key, $value, $this->level_column)
 			->from($this->_table)
 			->where($this->scope_column, '=', $this->{$this->scope_column})

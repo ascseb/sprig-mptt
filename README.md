@@ -10,10 +10,11 @@ Mathew Davies and Kiall Mac Innes. All the hardwork was done by them!
 
 The vast majority of functionality is the same, including the same function names etc.
 
-The only major change externally is that new_scope() has been renamed to insert_as_new_root() to 
-keep things more consistent and to work better with Sprig's validation.
+The only major changes externally is that new_scope() has been renamed to insert_as_new_root() to 
+keep things more consistent and to work better with Sprig's validation, and that parents() is renamed to ancestors().
 
 Also, as all fields have to be specified in Sprig, the four MPTT columns are defined by Sprig_Field_MPTT_* objects. They are optional though, with Sprig_MPTT automatically creating default MPTT fields if none are specified (see below).
+Sprig_MPTT also defines foreign fields for parent, ancestors, descendants, children etc. for you, see public $related to change the plural used to "load with" ("children" could become "sub_categories" for example, for overwriting only a select few values use _init())
 
 There may be other minor differences or bugs introduced. I'll try to fix them or point them out as I find them.
 
@@ -53,10 +54,7 @@ To create a new MPTT record, you need to use one of the insert_* methods.
 Before you create any other records in a tree, you need to create the root record for the tree. This can be done like:
 
 	// Get the root node for the scope 1
-	$root = Sprig::factory('test')->load(
-			Sprig_MPTT::factory('test')
-				->root(1)
-		);
+	$root = Sprig::factory('test')->root($root, 1)->load($root);
 	
 	// If the root node isn't loaded, we must create it before we can do anything else with the tree in scope 1
 	if ( ! $root->loaded())
@@ -106,7 +104,7 @@ Deleting a node is the same as in Sprig. As is pretty much everything else.
 A model's related nodes can be accessed using:
 
 	$model->parent;		// returns Sprig object for direct parent
-	$model->parents;	// returns DB result for all ancestors
+	$model->ancestors;	// returns DB result for all ancestors
 	$model->descendants;	// returns DB result containting all descendants
 	$model->children;	// returns DB result containing direct children
 	$model->first_child;	// returns Sprig object for first child
@@ -125,11 +123,7 @@ Using the selectors described in the previous section will return the sprig obje
 
 For example, to select all children of the current 'foo' model with the field 'bar' being equal to 'baz', you would type:
 
-	$result = Sprig::factory('foo')->load(
-		Sprig_MPTT::factory('foo')
-			->children()
-			->where('bar', '=', 'baz');
-		);
+	$result = Sprig::factory('foo', array('bar' => 'baz'))->children($result)->load($result, FALSE);
 
 The use of Sprig_MPTT over Sprig is irrelevent, i've only done that for the code's readability.
 
@@ -137,12 +131,3 @@ The use of Sprig_MPTT over Sprig is irrelevent, i've only done that for the code
 
  - There are some known limitations such as you can only use an integer as a scope -- this may or may not warrant further work
  - Fix the any bugs that are found!
-	
-	
-	
-	
-	
-	
-	
-	
-	

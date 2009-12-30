@@ -58,9 +58,9 @@ abstract class Darsstar_Sprig extends Shadowhand_Sprig {
 			// Go down the line of objects to find the given target
 			$parent = $target;
 
-			if ($parent instanceof Sprig_MPTT AND in_array($alias, array('ancestors', 'descendants', 'children', 'leaves', 'siblings')))
+			if ($parent instanceof Sprig_MPTT AND in_array($alias, $parent->related))
 			{
-				$alias = Inflector::singular($alias);
+				$alias = array_search($alias, $parent->related);
 			}
 
 			if ( ! array_key_exists($alias, $target->_fields))
@@ -99,7 +99,7 @@ abstract class Darsstar_Sprig extends Shadowhand_Sprig {
 			if( ! isset($this->_with_applied[$parent_path]))
 			{
 				// If the parent path hasn't been joined yet, do it first (otherwise LEFT JOINs fail)
-				$this->with($parent_path);
+				$this->_with($parent_path);
 			}
 		}
 
